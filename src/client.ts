@@ -1,6 +1,3 @@
-
-import { htons, ntohs, htonl, ntohl } from 'network-byte-order';
-
 import * as net from 'net';
 import { 
     TIME_NONE, OP_MULTI_OPERATION, OP_INJECT_SECTION, OP_SPLICE, 
@@ -56,15 +53,18 @@ export class Client {
      * @param buffer 
      */
     private decodeSingleOperationHeader(buffer : Buffer): SingleOperationMessageHeader {
+
+        
+
         return {
-            AS_index: ntohs(buffer, 0), 
-            DPI_PID_index: ntohs(buffer, 2), 
-            messageSize: ntohs(buffer, 4), 
-            message_number: ntohs(buffer, 6), 
-            opID: buffer[8], 
-            protocol_version: buffer[9], 
-            result: buffer[10], 
-            result_extension: ntohs(buffer, 11)
+            AS_index: buffer.readUInt16BE(0), 
+            DPI_PID_index: buffer.readUInt16BE(2), 
+            messageSize: buffer.readUInt16BE(4), 
+            message_number: buffer.readUInt16BE(6), 
+            opID: buffer.readUInt8(8), 
+            protocol_version: buffer.readUInt8(9), 
+            result: buffer.readUInt8(10), 
+            result_extension: buffer.readUInt16BE(11)
         };
     }
 
@@ -227,29 +227,32 @@ export class Client {
             let buffer = new Buffer(7);
             let type1 = <TimestampType1>timestamp;
 
-            buffer[0] = 1;
-            htonl(buffer, 1, type1.UTC_seconds);
-            htonl(buffer, 5, type1.UTC_microseconds);
+            buffer.writeUInt8(1, 0);
+            buffer.writeUInt32BE(type1.UTC_seconds, 1);
+            buffer.writeUInt32BE(type1.UTC_microseconds, 5);
+
             return buffer;
 
         } else if (timestamp.time_type === 2) {
             let buffer = new Buffer(5);
             let type2 = <TimestampType2>timestamp;
 
-            buffer[0] = 2;
-            buffer[1] = type2.hours;
-            buffer[2] = type2.minutes;
-            buffer[3] = type2.seconds;
-            buffer[4] = type2.frames;
+            buffer.writeUInt8(2,                0);
+            buffer.writeUInt8(type2.hours,      1);
+            buffer.writeUInt8(type2.minutes,    2);
+            buffer.writeUInt8(type2.seconds,    3);
+            buffer.writeUInt8(type2.frames,     4);
+
             return buffer;
 
         } else if (timestamp.time_type === 3) {
             let buffer = new Buffer(3);
             let type3 = <TimestampType3>timestamp;
 
-            buffer[0] = 3;
-            buffer[1] = type3.GPI_number;
-            buffer[2] = type3.GPI_edge;
+            buffer.writeUInt8(3,                0);
+            buffer.writeUInt8(type3.GPI_number, 1);
+            buffer.writeUInt8(type3.GPI_edge,   2);
+
             return buffer;
         } else {
             throw new Error(`No defined time type with ID ${timestamp.time_type}`);
@@ -263,10 +266,12 @@ export class Client {
         if (time_type === 1) {
             let moreBuf = await this.read(6);
 
+            
+
             return <TimestampType1>{
                 time_type: 1,
-                UTC_seconds: ntohl(moreBuf, 0),
-                UTC_microseconds: ntohl(moreBuf, 4)
+                UTC_seconds: moreBuf.readUInt32BE(0),
+                UTC_microseconds: moreBuf.readUInt32BE(4)
             };
 
         } else if (time_type === 2) {
@@ -295,53 +300,16 @@ export class Client {
     private encodeSingleOperationHeader(header : SingleOperationMessageHeaderInit, dataLength = 0): Buffer {
         let buffer = new Buffer(SINGLE_OPERATION_HEADER_SIZE);
         
-        htons(buffer, 0, header.opID);
-
-        // 8.2.2.1. Semantics of fields in single_operation_message() 
-        // messageSize – The size of the entire single_operation_message() structure in bytes. 
-        // COMMENT: Our message size is 13
-        htons(buffer, 2, 13 + dataLength);
-
-        // 8.2.2.1. Semantics of fields in single_operation_message() 
-        // The results to the requested message. See Section 14 (Result Codes) for details on the result
-        // codes. For message Usage types (as shown in the Usage column of Table 8-3) other than Basic Response
-        // messages, this shall be set to 0xFFFF. 
-        // COMMENT: Since this is a "basic request" (and thus not "basic response") we use 0xFFFF
-        htons(buffer, 4, header.result);
-
-        // ...
-        // result_extension – This shall be set to 0xFFFF unless used to send additional result information in a
-        // response message. 
-        htons(buffer, 6, header.result_extension === undefined ? 0xFFFF : header.result_extension);
-
-        // 8.2.2. Single operation message, "protocol_version"
-        // An 8-bit unsigned integer field whose function is to allow, in the future, this
-        // message type to carry parameters that may be structured differently than those defined in the current
-        // protocol. It shall be zero (0x00). Non-zero values of protocol_version may be used by a future version
-        // of this standard to indicate structurally different messages
-
-        buffer.set(new Uint8Array([ header.protocol_version ]), 8); // protocol_version
-
-        // 8.2.1.1. AS_index 
-        // The number ranges from 0 to 255 and shall be zero if this index is not required.
-        buffer.set(new Uint8Array([ header.AS_index ]), 9); // AS_index
-
-        // 8.2.3.3. Semantics of fields in multiple_operation_message() 
-        // message_number – An integer value that is used to identify an individual message. The
-        // message_number variable must be unique for the life of a message. When multiple copies of the same
-        // message are sent, they can be identified because they have the same message_number.
-        buffer.set(new Uint8Array([ header.message_number ]), 10);
-
-        // 8.2.1.2. DPI_PID_index 
-        // DPI_PID_index specifies the index to the DPI PID which will carry the resulting splice_info_sections.
-        // The number ranges from 0 to 65535. DPI_PID_index shall be zero if not required by the system
-        // architecture. 
-        // COMMENT: I think we send zero for DPI_PID_index, though TYT has unique_program_id of 22211
-
-        htons(buffer, 11, 0);
+        buffer.writeUInt16BE(header.opID, 0);
+        buffer.writeUInt16BE(13 + dataLength, 2);
+        buffer.writeUInt16BE(header.result, 4);
+        buffer.writeUInt16BE(header.result_extension === undefined ? 0xFFFF : header.result_extension, 6);
+        buffer.writeUInt8(header.protocol_version, 8);
+        buffer.writeUInt8(header.AS_index, 9);
+        buffer.writeUInt8(header.message_number, 10);
+        buffer.writeUInt16BE(header.DPI_PID_index, 11);
 
         return buffer;
-
     }
 
     private write(buffer : Buffer) {
@@ -416,8 +384,8 @@ export class Client {
 
     private encodeTime(seconds : number, microseconds : number): Buffer {
         let buf = new Buffer(8);
-        htonl(buf, 0, seconds);
-        htonl(buf, 4, microseconds);
+        buf.writeUInt32BE(seconds, 0);
+        buf.writeUInt32BE(microseconds, 4);
         return buf;
     }
 }

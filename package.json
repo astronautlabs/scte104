@@ -1,0 +1,32 @@
+{
+  "name": "@astronautlabs/scte104",
+  "version": "0.0.1",
+  "description": "Implementation of the SCTE-104 TCP/IP protocol",
+  "main": "dist/index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/astronautlabs/scte104.git"
+  },
+  "keywords": [
+    "scte",
+    "scte-104",
+    "broadcast",
+    "signalling"
+  ],
+  "author": "Astronaut Labs",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/astronautlabs/scte104/issues"
+  },
+  "homepage": "https://github.com/astronautlabs/scte104#readme",
+  "devDependencies": {
+    "typescript": "^3.8.3"
+  }
+}

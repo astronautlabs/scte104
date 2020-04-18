@@ -2,6 +2,12 @@
     "compilerOptions": {
         "target": "ES2016",
         "module": "commonjs",
-        "moduleResolution": "node"
-    }
+        "moduleResolution": "node",
+        "outDir": "dist",
+        "declaration": true,
+        "sourceMap": true
+    },
+    "include": [
+        "./src/**/*.ts"
+    ]
 }
