@@ -1,19 +1,20 @@
 import * as net from 'net';
-import { 
-    TIME_NONE, OP_MULTI_OPERATION, OP_INJECT_SECTION, OP_SPLICE, 
-    OP_INSERT_DTMF_DESCRIPTOR, OP_INSERT_TIME_DESCRIPTOR, 
-    OP_INSERT_AVAIL_DESCRIPTOR, OP_INSERT_SEGMENTATION_DESCRIPTOR, 
-    OP_INSERT_DESCRIPTOR, OP_INSERT_TIER, OP_PROPRIETARY_COMMAND, 
-    SINGLE_OPERATION_HEADER_SIZE, OP_INIT_REQUEST, OP_ALIVE_REQUEST,
-    SingleOperationMessageHeader, SingleOperationMessage, 
-    SingleOperationMessageHeaderInit, MultipleOperationMessageInit, 
-    Timestamp, OperationMessage, InjectSection, Splice, InsertDTMFDescriptor, InsertTimeDescriptor, InsertAvailDescriptor, InsertSegmentationDescriptor, InsertDescriptor, InsertTier, ProprietaryCommand, TimestampType1, TimestampType2, TimestampType3
-} from './protocol';
+// import { 
+//     TIME_NONE, SINGLE_OPERATION_HEADER_SIZE,
+//     SingleOperationMessageHeader, SingleOperationMessage, 
+//     SingleOperationMessageHeaderInit, MultipleOperationMessageInit, 
+//     Timestamp, OperationMessage, InjectSection, Splice, InsertDTMFDescriptor, 
+//     InsertTimeDescriptor, InsertAvailDescriptor, InsertSegmentationDescriptor, 
+//     InsertDescriptor, InsertTier, ProprietaryCommand, TimestampType1, 
+//     TimestampType2, TimestampType3, OP
+// } from './protocol';
+
+import * as Protocol from './protocol';
 
 export class Client {
     socket : net.Socket;
-    messageNumber = 0;
-    readBuffer : Buffer;
+    messageNumber = 300;
+    readBuffer : Buffer = Buffer.alloc(0);
     desiredReadLength = 0;
     readResponder : (data : Buffer) => void;
 
@@ -22,53 +23,136 @@ export class Client {
     protocolVersion = 0;
     scte35ProtocolVersion = 0;
 
-    connect(host : string, port = 5167) {
-        this.socket = net.createConnection({ host, port });        
+    async connect(host : string, port = 5167) {
+        this.messageNumber = Date.now() % 255;
+        this.connected = new Promise((resolve, reject) => 
+            (this.connectedResolver = resolve, this.connectedRejecter = reject)
+        );
 
+        this.socket = net.createConnection({ host, port });
         this.socket.addListener('connect', () => this.onConnect());
+        this.socket.addListener('error', err => this.onError(err))
+        this.socket.addListener('close', () => this.onClose())
         this.socket.addListener('data', data => this.onData(data));
+
+        return await this.connected;
     }
 
+    private connectedResolver : () => void;
+    private connectedRejecter : (err? : Error) => void;
+    private connected : Promise<void>;
+
+    private async onError(err : Error) {
+        if (this.connectedRejecter) {
+            this.connectedRejecter(err);
+            this.connectedRejecter = null;
+            this.connectedResolver = null;
+        }
+    }
+
+    private async onClose() {
+        console.log(`Disconnected.`);
+    }
     private async onConnect() {
-
+        if (this.connectedResolver) {
+            this.connectedResolver();
+            this.connectedResolver = null;
+            this.connectedRejecter = null;
+        }
     }
 
-    private onData(data : Buffer) {
+    private fireEvent(name : string, event : any) {
+        (this.mappedEvents.get(name) || []).forEach(x => x(event));
+    }
+
+    private mappedEvents = new Map<string, ((event) => void)[]>();
+
+    addEventListener(event : string, handler : (event) => void) {
+        this.mappedEvents.set(
+            event, 
+            (this.mappedEvents.get(event) || [])
+                .concat([ handler ])
+        );
+    }
+
+    removeEventListener(event : string, handler : (event) => void) {
+        this.mappedEvents.set(
+            event, 
+            (this.mappedEvents.get(event) || [])
+                .filter(x => x !== handler)
+        );
+    }
+
+    private async onData(data : Buffer) {
+        console.log(`Receiving data (${data.length})...`);
         this.readBuffer = Buffer.concat([this.readBuffer, data]);
 
-        if (!this.readResponder) {
-            throw new Error(`WARNING: Received unexpected content from remote end`);
+        // Read responders are used to continue an incomplete message that is 
+        // currently being read
+
+        if (this.readResponder) {
+            this.pumpReadResponder();
+            return;
         }
 
-        if (this.readBuffer.length > this.desiredReadLength) {
-            let subBuffer = this.readBuffer.slice(0, this.desiredReadLength);
-            this.readBuffer = this.readBuffer.slice(this.desiredReadLength);
-            this.readResponder(subBuffer);
-            this.readResponder = null;
+        // This is a new Single Operation Message
+
+        this.readBuffer = data;
+        let message = await this.readSingleOperation();
+
+        // Send it off to any listeners
+        
+        if (message.opID === Protocol.OP.GENERAL_RESPONSE) {
+            console.log(`(INFO) General response received:`);
+            console.dir(message);
         }
+
+        console.log(`Received 0x${message.opID.toString(16)} [${Protocol.OP.name(message.opID) || 'unknown'}]`);
+        console.log(`  Message number: ${message.message_number}`);
+        console.log(`  Result:         0x${message.result} [${Protocol.RESULT.name(message.result)}]`);
+        console.log(`  Result (Ext):   0x${message.result_extension.toString(16)}`);
+        console.log(`  Data:           ${message.messageSize} bytes total, payload=${message.data.length} byte(s)`);
+        console.dir(message);
+
+        this.fireEvent('message', { message });
+    }
+
+    private pumpReadResponder() {
+        if (this.readBuffer.length < this.desiredReadLength)
+            return;
+        
+        let subBuffer = this.readBuffer.slice(0, this.desiredReadLength);
+        this.readBuffer = this.readBuffer.slice(this.desiredReadLength);
+        this.readResponder(subBuffer);
+        this.readResponder = null;
     }
 
     /**
      * Takes a 13 byte buffer and decodes it into a SingleOperationMessageHeader
      * @param buffer 
      */
-    private decodeSingleOperationHeader(buffer : Buffer): SingleOperationMessageHeader {
+    private decodeSingleOperationHeader(buffer : Buffer): Protocol.SingleOperationMessageHeader {
 
-        
+        if (buffer.length < 13) {
+            throw new Error(
+                `Cannot decodeSingleOperationHeader(): ` 
+                + `Buffer must be >=13 bytes, passed length=${buffer.length}`
+            );
+        }
 
         return {
-            AS_index: buffer.readUInt16BE(0), 
-            DPI_PID_index: buffer.readUInt16BE(2), 
-            messageSize: buffer.readUInt16BE(4), 
-            message_number: buffer.readUInt16BE(6), 
-            opID: buffer.readUInt8(8), 
-            protocol_version: buffer.readUInt8(9), 
-            result: buffer.readUInt8(10), 
-            result_extension: buffer.readUInt16BE(11)
+            opID: buffer.readUInt16BE(0), 
+            messageSize: buffer.readUInt16BE(2), 
+            result: buffer.readUInt16BE(4), 
+            result_extension: buffer.readUInt16BE(6),
+            protocol_version: buffer.readUInt8(8), 
+            AS_index: buffer.readUInt8(9), 
+            message_number: buffer.readUInt8(10), 
+            DPI_PID_index: buffer.readUInt16BE(11), 
         };
     }
 
-    private sizeOfTimestamp(timestamp : Timestamp) {
+    private sizeOfTimestamp(timestamp : Protocol.Timestamp) {
         if (timestamp.time_type === 0)
             return 0;
         else if (timestamp.time_type === 1)
@@ -81,53 +165,71 @@ export class Client {
         throw new Error(`Cannot determine size of timestamp with unspecified type ${timestamp.time_type}`);
     }
 
-    async multipleOperations(message : MultipleOperationMessageInit) {
-        let buf = new Buffer(10);
-        let timestamp = message.timestamp || TIME_NONE;
-        let timestampSize = this.sizeOfTimestamp(timestamp) ;
-        let operationPayload = Buffer.concat(message.operations.map(x => this.prepareOperation(x)));
-        let messageSize = 11 + timestampSize + operationPayload.length;
+    async multipleOperations(message : Protocol.MultipleOperationMessageInit) {
+        await new Promise(async (resolve, reject) => {
+            let buf = Buffer.alloc(10);
+            let timestamp = message.timestamp || Protocol.TIME_NONE;
+            let timestampSize = this.sizeOfTimestamp(timestamp) ;
+            let operationCount = Buffer.alloc(1);
+            operationCount.writeInt8(message.operations.length);
 
-        buf.writeUInt16BE(OP_MULTI_OPERATION, 0);
-        buf.writeUInt16BE(messageSize, 2);
+            let operationPayload = Buffer.concat([ operationCount ].concat(message.operations.map(x => this.prepareOperation(x))));
+            let messageSize = 11 + timestampSize + operationPayload.length;
 
-        // Session-specific
+            buf.writeUInt16BE(Protocol.MULTIPLE_OPERATION_INDICATOR, 0);
+            buf.writeUInt16BE(messageSize, 2);
 
-        buf.writeUInt8(this.protocolVersion, 4);
-        buf.writeUInt8(this.asIndex, 5);
-        buf.writeUInt8(this.messageNumber++, 6);
-        buf.writeUInt16BE(this.dpiPidIndex, 7);
-        buf.writeUInt8(this.scte35ProtocolVersion, 9);
+            // Session-specific
 
-        // Write the header, timestamp, and individual operations
-        await this.write(Buffer.concat([
-            buf, 
-            this.encodeTimestamp(timestamp),
-            operationPayload
-        ]));
+            let messageNumber = this.messageNumber++;
+
+            buf.writeUInt8(this.protocolVersion, 4);
+            buf.writeUInt8(this.asIndex, 5);
+            buf.writeUInt8(messageNumber, 6);
+            buf.writeUInt16BE(this.dpiPidIndex, 7);
+            buf.writeUInt8(this.scte35ProtocolVersion, 9);
+            
+            let handler;
+            handler = (ev) => {
+                let message : Protocol.SingleOperationMessage = ev.message;
+                
+                console.log(`MOP handler received a response`);
+                if (message.opID === Protocol.OP.INJECT_RESPONSE) {
+                    console.log(`MOP #${messageNumber} is acknowledged`);
+                    resolve();
+                }
+            };
+            
+            console.log(`Sending MOP #${messageNumber}...`);
+            this.addEventListener('message', handler);
+
+            // Write the header, timestamp, and individual operations
+            await this.write(Buffer.concat([
+                buf, 
+                this.encodeTimestamp(timestamp),
+                operationPayload
+            ]));
+        });
+
     }
 
-    private prepareOperation(operation : OperationMessage) {
-        let header = new Buffer(2);
-        header.writeUInt16BE(operation.opID, 0);
-        header.writeUInt16BE(operation.data.length, 2);
-
+    private prepareOperation(operation : Protocol.OperationMessage) {
         let data = operation.data;
         
         if (!data) {
             switch (operation.opID) {
-                case OP_INJECT_SECTION: {
-                    let message = <InjectSection>operation;
-                    let header = new Buffer(4);
+                case Protocol.MOP.INJECT_SECTION: {
+                    let message = <Protocol.InjectSection>operation;
+                    let header = Buffer.alloc(4);
                     header.writeUInt16BE(message.SCTE35_command_contents.length, 0);
                     header.writeUInt8(message.SCTE35_protocol_version, 2);
                     header.writeUInt8(message.SCTE35_command_type, 3);
 
                     data = Buffer.concat([ header, message.SCTE35_command_contents ]);
                 } break;
-                case OP_SPLICE: {
-                    let message = <Splice>operation;
-                    let header = new Buffer(14);
+                case Protocol.MOP.SPLICE: {
+                    let message = <Protocol.Splice>operation;
+                    let header = Buffer.alloc(14);
 
                     header.writeUInt8(message.splice_insert_type, 0);
                     header.writeUInt32BE(message.splice_event_id, 1);
@@ -140,20 +242,20 @@ export class Client {
 
                     data = header;
                 } break;
-                case OP_INSERT_DTMF_DESCRIPTOR: {
-                    let message = <InsertDTMFDescriptor>operation;
-                    let header = new Buffer(1);
+                case Protocol.MOP.INSERT_DTMF_DESCRIPTOR: {
+                    let message = <Protocol.InsertDTMFDescriptor>operation;
+                    let header = Buffer.alloc(1);
 
                     header.writeUInt8(message.preroll, 0);
 
                     data = Buffer.concat([header, message.dtmf]);
                 } break;
-                case OP_INSERT_TIME_DESCRIPTOR: {
-                    let message = <InsertTimeDescriptor>operation;
-                    let header = new Buffer(12);
+                case Protocol.MOP.INSERT_TIME_DESCRIPTOR: {
+                    let message = <Protocol.InsertTimeDescriptor>operation;
+                    let header = Buffer.alloc(12);
 
                     // 6-byte number, really?
-                    let subbuf = new Buffer(8);
+                    let subbuf = Buffer.alloc(8);
                     subbuf.writeBigUInt64BE(BigInt(message.TAI_seconds));
                     subbuf.copy(header, 0, 2);
 
@@ -162,18 +264,18 @@ export class Client {
 
                     data = header;
                 } break;
-                case OP_INSERT_AVAIL_DESCRIPTOR: {
-                    let message = <InsertAvailDescriptor>operation;
+                case Protocol.MOP.INSERT_AVAIL_DESCRIPTOR: {
+                    let message = <Protocol.InsertAvailDescriptor>operation;
 
-                    data = new Buffer(1 + 4 * message.provider_avail_id.length);
+                    data = Buffer.alloc(1 + 4 * message.provider_avail_id.length);
                     data.writeUInt8(message.provider_avail_id.length, 0);
                     for (let i = 0, max = message.provider_avail_id.length; i < max; ++i) {
                         data.writeUInt32BE(message.provider_avail_id[i], 1 + i * 4);
                     }
                 } break;
-                case OP_INSERT_SEGMENTATION_DESCRIPTOR: {
-                    let message = <InsertSegmentationDescriptor>operation;
-                    data = new Buffer(18 + message.segmentation_upid.length);
+                case Protocol.MOP.INSERT_SEGMENTATION_DESCRIPTOR: {
+                    let message = <Protocol.InsertSegmentationDescriptor>operation;
+                    data = Buffer.alloc(18 + message.segmentation_upid.length);
 
                     data.writeUInt32BE(message.segmentation_event_id, 0);
                     data.writeUInt8(message.segmentation_event_cancel_indicator, 4);
@@ -194,23 +296,23 @@ export class Client {
                     data.writeUInt8(message.archive_allowed_flag, offset + 7);
                     data.writeUInt8(message.device_restrictions, offset + 8);
                 } break;
-                case OP_INSERT_DESCRIPTOR: {
-                    let message = <InsertDescriptor>operation;
-                    let header = new Buffer(1);
+                case Protocol.MOP.INSERT_DESCRIPTOR: {
+                    let message = <Protocol.InsertDescriptor>operation;
+                    let header = Buffer.alloc(1);
                     header.writeUInt8(message.descriptor_image.length);
 
                     data = Buffer.concat([ header, ...message.descriptor_image ]);
                 } break;
-                case OP_INSERT_TIER: {
-                    let message = <InsertTier>operation;
+                case Protocol.MOP.INSERT_TIER: {
+                    let message = <Protocol.InsertTier>operation;
 
-                    data = new Buffer(2);
+                    data = Buffer.alloc(2);
                     data.writeUInt16BE(message.tier, 0);
                 } break;
-                case OP_PROPRIETARY_COMMAND: {
-                    let message = <ProprietaryCommand>operation;
+                case Protocol.MOP.PROPRIETARY_COMMAND: {
+                    let message = <Protocol.ProprietaryCommand>operation;
 
-                    let header = new Buffer(5);
+                    let header = Buffer.alloc(5);
                     header.writeUInt32BE(message.proprietary_id, 0);
                     header.writeUInt8(message.proprietary_command, 4);
                     
@@ -219,13 +321,21 @@ export class Client {
             }
         }
 
+        let header = Buffer.alloc(4);
+        header.writeUInt16BE(operation.opID, 0);
+        header.writeUInt16BE(data.length, 2);
+
         return Buffer.concat([ header, data ]);
     }
 
-    private encodeTimestamp(timestamp : Timestamp) {
-        if (timestamp.time_type === 1) {
-            let buffer = new Buffer(7);
-            let type1 = <TimestampType1>timestamp;
+    private encodeTimestamp(timestamp : Protocol.Timestamp) {
+        if (timestamp.time_type === 0) {
+            let buffer = Buffer.alloc(1);
+            buffer.writeUInt8(0);
+            return buffer;
+        } else if (timestamp.time_type === 1) {
+            let buffer = Buffer.alloc(7);
+            let type1 = <Protocol.TimestampType1>timestamp;
 
             buffer.writeUInt8(1, 0);
             buffer.writeUInt32BE(type1.UTC_seconds, 1);
@@ -234,8 +344,8 @@ export class Client {
             return buffer;
 
         } else if (timestamp.time_type === 2) {
-            let buffer = new Buffer(5);
-            let type2 = <TimestampType2>timestamp;
+            let buffer = Buffer.alloc(5);
+            let type2 = <Protocol.TimestampType2>timestamp;
 
             buffer.writeUInt8(2,                0);
             buffer.writeUInt8(type2.hours,      1);
@@ -246,8 +356,8 @@ export class Client {
             return buffer;
 
         } else if (timestamp.time_type === 3) {
-            let buffer = new Buffer(3);
-            let type3 = <TimestampType3>timestamp;
+            let buffer = Buffer.alloc(3);
+            let type3 = <Protocol.TimestampType3>timestamp;
 
             buffer.writeUInt8(3,                0);
             buffer.writeUInt8(type3.GPI_number, 1);
@@ -259,7 +369,7 @@ export class Client {
         }
     }
 
-    private async readTimestamp(): Promise<Timestamp> {
+    private async readTimestamp(): Promise<Protocol.Timestamp> {
         let buf = await this.read(1);
         let time_type = buf[0];
 
@@ -268,7 +378,7 @@ export class Client {
 
             
 
-            return <TimestampType1>{
+            return <Protocol.TimestampType1>{
                 time_type: 1,
                 UTC_seconds: moreBuf.readUInt32BE(0),
                 UTC_microseconds: moreBuf.readUInt32BE(4)
@@ -277,7 +387,7 @@ export class Client {
         } else if (time_type === 2) {
             let moreBuf = await this.read(4);
             
-            return <TimestampType2>{
+            return <Protocol.TimestampType2>{
                 time_type: 2,
                 hours: moreBuf[0],
                 minutes: moreBuf[1],
@@ -288,7 +398,7 @@ export class Client {
         } else if (time_type === 3) {
             let moreBuf = await this.read(2);
             
-            return <TimestampType3>{
+            return <Protocol.TimestampType3>{
                 time_type: 3,
                 GPI_edge: moreBuf[0],
                 GPI_number: moreBuf[1]
@@ -297,8 +407,8 @@ export class Client {
 
     }
 
-    private encodeSingleOperationHeader(header : SingleOperationMessageHeaderInit, dataLength = 0): Buffer {
-        let buffer = new Buffer(SINGLE_OPERATION_HEADER_SIZE);
+    private encodeSingleOperationHeader(header : Protocol.SingleOperationMessageHeaderInit, dataLength = 0): Buffer {
+        let buffer = Buffer.alloc(Protocol.SINGLE_OPERATION_HEADER_SIZE);
         
         buffer.writeUInt16BE(header.opID, 0);
         buffer.writeUInt16BE(13 + dataLength, 2);
@@ -327,63 +437,97 @@ export class Client {
         if (this.readResponder)
             throw new Error(`ERROR: Pending read already in progress!`);
 
+        //console.log(`Awaiting ${length} bytes...`);
         let promiseResolve : (buffer : Buffer) => void, promiseReject : (err) => void;
         let promise = new Promise<Buffer>((resolve, reject) => (promiseResolve = resolve, promiseReject = reject));
         this.readResponder = promiseResolve;
+        this.desiredReadLength = length;
+        this.pumpReadResponder();
+
         return promise;
     }
 
-    private async readSingleOperation(): Promise<SingleOperationMessage> {
-        let headerBuf = await this.read(SINGLE_OPERATION_HEADER_SIZE);
+    private async readSingleOperation(): Promise<Protocol.SingleOperationMessage> {
+        //console.log(`Reading single operation header...`);
+        let headerBuf = await this.read(Protocol.SINGLE_OPERATION_HEADER_SIZE);
         let responseHeader = this.decodeSingleOperationHeader(headerBuf);
-        let payloadSize = responseHeader.messageSize - SINGLE_OPERATION_HEADER_SIZE;
+        let payloadSize = responseHeader.messageSize - Protocol.SINGLE_OPERATION_HEADER_SIZE;
+        
+        
+        //console.log(`Reading single operation payload of ${payloadSize} bytes for opID=0x${responseHeader.opID.toString(16)}...`);
         let payload = await this.read(payloadSize);
 
+        //console.log(`single operation: success`);
         return Object.assign(responseHeader, { data: payload });
     }
 
     async init() {
-        await this.writeSingleOperation({
-            opID: OP_INIT_REQUEST,
-            result: 0xFFFF,
-            AS_index: this.asIndex,
-            DPI_PID_index: this.dpiPidIndex,
-            message_number: this.messageNumber++,
-            protocol_version: 0
-        });
+        await new Promise(async (resolve, reject) => {
+            let handler : (ev) => void;
 
-        let response = this.readSingleOperation();
-        // TODO: check response.result
+            handler = (ev) => {
+                let message : Protocol.SingleOperationMessage = ev.message;
+
+                if (message.opID === Protocol.OP.INIT_RESPONSE) {
+                    // console.log(`Init response():`);
+                    // console.dir(message);
+                    resolve();
+
+                    this.removeEventListener('message', handler);
+                }
+            }
+
+            this.addEventListener('message', handler);
+    
+            await this.writeSingleOperation({
+                opID: Protocol.OP.INIT_REQUEST,
+                result: 0xFFFF,
+                AS_index: this.asIndex,
+                DPI_PID_index: this.dpiPidIndex,
+                message_number: this.messageNumber++,
+                protocol_version: 0
+            });
+        });
     }
 
-    private async writeSingleOperation(header : SingleOperationMessageHeaderInit, data? : Buffer) {
+    private async writeSingleOperation(header : Protocol.SingleOperationMessageHeaderInit, data? : Buffer) {
         await this.write(this.encodeSingleOperationHeader(header, data ? data.length : 0));
         if (data)
             await this.write(data);
     }
 
     async alive() {
-        let epoch = new Date('1980-01-06T00:00:00Z').getTime();
-        let elapsed = Date.now() - epoch;
+        await new Promise(async (resolve, reject) => {
+            let epoch = new Date('1980-01-06T00:00:00Z').getTime();
+            let elapsed = Date.now() - epoch;
 
-        let seconds = Math.floor(elapsed / 1000);
-        let microseconds = (elapsed - seconds) * 1000;
+            let seconds = Math.floor(elapsed / 1000);
+            let microseconds = (elapsed - seconds) * 1000;
+            let handler;
 
-        await this.writeSingleOperation({
-            opID: OP_ALIVE_REQUEST,
-            AS_index: this.asIndex,
-            DPI_PID_index: this.dpiPidIndex,
-            message_number: this.messageNumber++,
-            protocol_version: 0,
-            result: 0xFFFF
-        }, this.encodeTime(seconds, microseconds));
+            handler = ev => {
+                let message : Protocol.SingleOperationMessage = ev.message;
+                if (message.opID === Protocol.OP.ALIVE_RESPONSE) {
+                    this.removeEventListener('message', handler);
+                    resolve();
+                }
+            };
 
-        let response = await this.readSingleOperation();
-        // we dont care about the response
+            this.addEventListener('message', handler);
+
+            await this.writeSingleOperation({
+                opID: Protocol.OP.ALIVE_REQUEST,
+                AS_index: this.asIndex,
+                DPI_PID_index: this.dpiPidIndex,
+                message_number: this.messageNumber++,
+                protocol_version: 0,
+                result: 0xFFFF
+            }, this.encodeTime(seconds, microseconds));
+        });
     }
 
     private encodeTime(seconds : number, microseconds : number): Buffer {
-        let buf = new Buffer(8);
+        let buf = Buffer.alloc(8);
         buf.writeUInt32BE(seconds, 0);
         buf.writeUInt32BE(microseconds, 4);
         return buf;

@@ -20,7 +20,7 @@ async function main(argv : string[]) {
     await client.multipleOperations({
         operations: [
             <SCTE104.Splice>{
-                opID: SCTE104.OP_SPLICE,
+                opID: SCTE104.OP.SPLICE,
                 splice_insert_type: SCTE104.SPLICE_START_NORMAL,
                 splice_event_id: Date.now() / 1000,
                 unique_program_id: 22211,
@@ -37,7 +37,7 @@ async function main(argv : string[]) {
     await client.multipleOperations({
         operations: [
             <SCTE104.Splice>{
-                opID: SCTE104.OP_SPLICE,
+                opID: SCTE104.OP.SPLICE,
                 splice_insert_type: SCTE104.SPLICE_END_NORMAL,
                 splice_event_id: Date.now() / 1000,
                 unique_program_id: 22211,

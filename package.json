@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -p .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run build && node dist/test"
   },
   "repository": {
     "type": "git",
@@ -27,6 +27,8 @@
   },
   "homepage": "https://github.com/astronautlabs/scte104#readme",
   "devDependencies": {
+    "razmin": "^0.6.10",
+    "source-map-support": "^0.5.16",
     "typescript": "^3.8.3"
   }
 }
