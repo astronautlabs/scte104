@@ -13,14 +13,32 @@ import * as Protocol from './protocol';
 
 export class Client {
     socket : net.Socket;
-    messageNumber = 300;
-    readBuffer : Buffer = Buffer.alloc(0);
-    desiredReadLength = 0;
-    readResponder : (data : Buffer) => void;
+    private messageNumber = 300;
+    private readBuffer : Buffer = Buffer.alloc(0);
+    private desiredReadLength = 0;
+    private readResponder : (data : Buffer) => void;
 
+    /**
+     * DPI PID index to include in SCTE-104 messages.
+     */
     dpiPidIndex = 0;
+
+    /**
+     * AS (automation system) index we are acting as 
+     */
     asIndex = 0;
+
+    /**
+     * Protocol version, must be 0x0 in existing spec,
+     * so this generally should not be changed.
+     */
     protocolVersion = 0;
+
+    /**
+     * SCTE-35 protocol version, used for SCTE-35 specific messages.
+     * Must be 0x0 in existing spec, so this generally should not 
+     * be changed.
+     */
     scte35ProtocolVersion = 0;
 
     async connect(host : string, port = 5167) {
@@ -36,6 +54,10 @@ export class Client {
         this.socket.addListener('data', data => this.onData(data));
 
         return await this.connected;
+    }
+
+    async disconnect() {
+        return new Promise(resolve => this.socket.end(() => resolve()));
     }
 
     private connectedResolver : () => void;
