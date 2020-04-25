@@ -1,4 +1,11 @@
 node_modules/
+
 dist/examples/
 dist/test.js
+dist/test.d.ts
 dist/**/*.test.js
+dist/**/*.test.d.ts
+
+src/test.ts
+src/**/*.test.ts
+src/examples/
