@@ -5,7 +5,9 @@
         "moduleResolution": "node",
         "outDir": "dist",
         "declaration": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
     },
     "include": [
         "./src/**/*.ts"
