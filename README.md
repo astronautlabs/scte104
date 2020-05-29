@@ -60,8 +60,6 @@ This library is very new, and no compatibility is currently guaranteed between
 releases (alpha, semver 0.0.x).
 
 ## Roadmap
-- Remove dependency on `network-byte-order` (use `Buffer.write*()` instead)
-- Implement proper asynchronous message handling in responses from the Communication System.
 - Implement the "server" (Communication System) side of the protocol
 - Provide an easy to access API for SCTE-104 encoding/decoding for auxiliary usecases
 - Provide an optional higher-level, opinionated fluent API on top
