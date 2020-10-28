@@ -1,6 +1,10 @@
 # @astronautlabs/scte104
 ## Implementation of the SCTE-104 TCP/IP protocol
 
+> **Alpha Quality**  
+> This library is very new, and no compatibility is currently guaranteed between 
+> releases (alpha, semver 0.0.x).
+
 This Typescript library provides a low-level, compliant implementation of the 
 Automation System to Compression System TCP/IP signalling protocol 
 specified in SCTE-104. It can be used to send signals to compliant 
@@ -53,11 +57,6 @@ async function main(argv : string[]) {
 
 main(process.argv.slice(1));
 ```
-
-## State of this library
-
-This library is very new, and no compatibility is currently guaranteed between 
-releases (alpha, semver 0.0.x).
 
 ## Roadmap
 - Implement the "server" (Communication System) side of the protocol

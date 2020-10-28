@@ -28,8 +28,13 @@
   },
   "homepage": "https://github.com/astronautlabs/scte104#readme",
   "devDependencies": {
+    "@types/node": "^14.0.4",
     "razmin": "^0.6.10",
     "source-map-support": "^0.5.16",
     "typescript": "^3.8.3"
+  },
+  "dependencies": {
+    "@astronautlabs/bitstream": "0.0.12",
+    "rxjs": "^6.6.3"
   }
 }
