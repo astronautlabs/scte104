@@ -42,7 +42,7 @@ export class Connection {
 }
 
 export class Server {
-    constructor(readonly port : number) {
+    constructor(readonly port = 5167) {
     }
 
     private _server : net.Server;
@@ -60,6 +60,7 @@ export class Server {
 
     async listen() {
         this._server = new net.Server(socket => new Connection(socket, this));
+        this._server.listen(this.port);
     }
 
     close() {
