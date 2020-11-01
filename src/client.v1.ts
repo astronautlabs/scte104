@@ -4,7 +4,7 @@ import * as Protocol from './protocol';
 /**
  * Original implementation of SCTE 104 client
  */
-export class ClientV1 {
+export class Client {
     socket : net.Socket;
     private messageNumber = 300;
     private readBuffer : Buffer = Buffer.alloc(0);

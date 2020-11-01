@@ -4,7 +4,7 @@ import { TIME_TYPE_SMPTE_VITC, TimestampType2 } from '../protocol';
 import { MultipleOperationMessage, SpliceRequest } from '../syntax';
 
 async function main(argv : string[]) {
-    let client = new SCTE104.Client();
+    let client = new SCTE104.ClientV2();
     let host = '1.2.3.4';
 
     console.log(`Connecting to ${host}...`);

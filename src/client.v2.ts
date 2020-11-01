@@ -6,7 +6,7 @@ import * as syntax from './syntax';
 import { SingleOperationMessage } from './syntax';
 import { filter, take } from 'rxjs/operators';
 
-export class Client {
+export class ClientV2 {
     socket : net.Socket;
     private messageNumber = 300;
 
