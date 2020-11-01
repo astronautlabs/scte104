@@ -13,14 +13,25 @@ export class SyntaxRegistry {
 }
 
 export function Operation(opCode : number) {
-    return target => { SyntaxRegistry.operations.set(opCode, target.constructor) };
+    return target => { 
+        SyntaxRegistry.operations.set(opCode, target.constructor);
+        target.constructor.OP = opCode;
+    };
 }
 
 export function MOperation(opCode : number) {
-    return target => { SyntaxRegistry.operations.set(opCode, target.constructor) };
+    return target => { 
+        SyntaxRegistry.operations.set(opCode, target.constructor);
+        target.constructor.OP = opCode;
+    };
 }
 
 export class Message extends BitstreamElement {
+    constructor() {
+        super();
+        this.opID = (this.constructor as any).OP;
+    }
+
     @Field(16) opID : number;
     @Field(16) messageSize : number;
 
