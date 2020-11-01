@@ -66,6 +66,71 @@ export class UnsupportedSOperation extends SingleOperationMessage {
 export class GeneralResponse extends SingleOperationMessage {
 }
 
+export class Timestamp extends BitstreamElement {
+    timeType : number;
+
+    static async deserializeSub(reader : BitstreamReader): Promise<Timestamp> {
+        let timeType = await reader.read(8);
+
+        if (timeType === Protocol.TIME_TYPE_UTC) {
+            let utcTimestamp = new UtcTimestamp();
+            utcTimestamp.timeType = timeType;
+            utcTimestamp.seconds = await reader.read(32);
+            utcTimestamp.microseconds = await reader.read(32);
+
+            return utcTimestamp;
+        } else if (timeType === Protocol.TIME_TYPE_SMPTE_VITC) {
+            let timestamp = new SmpteVitcTimestamp();
+            timestamp.timeType = timeType;
+            timestamp.hours = await reader.read(1);
+            timestamp.minutes = await reader.read(1);
+            timestamp.seconds = await reader.read(1);
+            timestamp.frames = await reader.read(1);
+
+            return timestamp;
+        } else if (timeType === Protocol.TIME_TYPE_GPI) {
+            let timestamp = new GpiTimestamp();
+            timestamp.number = await reader.read(1);
+            timestamp.edge = await reader.read(1);
+
+            return timestamp;
+        } else {
+            throw new Error(`Unknown time type ${timeType}`);
+        }
+    }
+
+    static async deserialize<T extends BitstreamElement>(this: Constructor<T>, reader: BitstreamReader): Promise<T> {
+        return <any> await Timestamp.deserializeSub(reader);
+    }
+}
+
+export class UtcTimestamp extends Timestamp {
+    seconds : number;
+    microseconds : number;
+}
+
+export class SmpteVitcTimestamp extends Timestamp {
+    hours : number;
+    minutes : number;
+    seconds : number;
+    frames : number;
+}
+
+export class GpiTimestamp extends Timestamp {
+    number : number;
+    edge : number;
+}
+
+export class Time extends BitstreamElement {
+    @Field(32) seconds : number;
+    @Field(32) microseconds : number;
+}
+
+export class MOperationElement extends BitstreamElement {
+    @Field(16) opID : number;
+    @Field(16) dataLength : number;
+}
+
 export class MultipleOperationMessage extends Message {
     @Field(8) protocolVersion = 0;
     @Field(8) asIndex = 0;
@@ -81,11 +146,6 @@ export class MultipleOperationMessage extends Message {
         for (let i = 0, max = await reader.read(8); i < max; ++i)
             this.operations.push(await SyntaxRegistry.readMOperation(reader, await reader.peek(16)));
     }
-}
-
-export class MOperationElement extends BitstreamElement {
-    @Field(16) opID : number;
-    @Field(16) dataLength : number;
 }
 
 @MOperation(undefined)
@@ -145,6 +205,18 @@ export class ProvisionedServiceDpiPid extends BitstreamElement {
     @Field(8) cueStreamType : number;
 }
 
+export class ComponentTag extends BitstreamElement {
+    @Field(8) value;
+}
+
+export class InjectorComponentList extends BitstreamElement {
+    @Field(8) videoComponentTag : number;
+    @Field(0, { array: { type: ComponentTag, countFieldLength: 8 }})
+    audioComponentTags : ComponentTag[];
+    @Field(0, { array: { type: ComponentTag, countFieldLength: 8 }})
+    dataComponentTags : ComponentTag[];
+}
+
 export class ProvisionedService extends BitstreamElement {
     @Field(32) injectorIpAddress : number;
     @Field(16) injectorSocketNumber : number;
@@ -160,18 +232,6 @@ export class ProvisionedService extends BitstreamElement {
             this.injectorComponentList = await InjectorComponentList.read(bitstream);
         }
     }
-}
-
-export class ComponentTag extends BitstreamElement {
-    @Field(8) value;
-}
-
-export class InjectorComponentList extends BitstreamElement {
-    @Field(8) videoComponentTag : number;
-    @Field(0, { array: { type: ComponentTag, countFieldLength: 8 }})
-    audioComponentTags : ComponentTag[];
-    @Field(0, { array: { type: ComponentTag, countFieldLength: 8 }})
-    dataComponentTags : ComponentTag[];
 }
 
 @Operation(Protocol.OP.PROVISIONING_REQUEST)
@@ -357,64 +417,4 @@ export class ASAliveRequest extends SingleOperationMessage {
 
 @Operation(Protocol.OP.AS_ALIVE_RESPONSE)
 export class ASAliveResponse extends SingleOperationMessage {
-}
-
-export class Time extends BitstreamElement {
-    @Field(32) seconds : number;
-    @Field(32) microseconds : number;
-}
-
-export class Timestamp extends BitstreamElement {
-    timeType : number;
-
-    static async deserializeSub(reader : BitstreamReader): Promise<Timestamp> {
-        let timeType = await reader.read(8);
-
-        if (timeType === Protocol.TIME_TYPE_UTC) {
-            let utcTimestamp = new UtcTimestamp();
-            utcTimestamp.timeType = timeType;
-            utcTimestamp.seconds = await reader.read(32);
-            utcTimestamp.microseconds = await reader.read(32);
-
-            return utcTimestamp;
-        } else if (timeType === Protocol.TIME_TYPE_SMPTE_VITC) {
-            let timestamp = new SmpteVitcTimestamp();
-            timestamp.timeType = timeType;
-            timestamp.hours = await reader.read(1);
-            timestamp.minutes = await reader.read(1);
-            timestamp.seconds = await reader.read(1);
-            timestamp.frames = await reader.read(1);
-
-            return timestamp;
-        } else if (timeType === Protocol.TIME_TYPE_GPI) {
-            let timestamp = new GpiTimestamp();
-            timestamp.number = await reader.read(1);
-            timestamp.edge = await reader.read(1);
-
-            return timestamp;
-        } else {
-            throw new Error(`Unknown time type ${timeType}`);
-        }
-    }
-
-    static async deserialize<T extends BitstreamElement>(this: Constructor<T>, reader: BitstreamReader): Promise<T> {
-        return <any> await Timestamp.deserializeSub(reader);
-    }
-}
-
-export class UtcTimestamp extends Timestamp {
-    seconds : number;
-    microseconds : number;
-}
-
-export class SmpteVitcTimestamp extends Timestamp {
-    hours : number;
-    minutes : number;
-    seconds : number;
-    frames : number;
-}
-
-export class GpiTimestamp extends Timestamp {
-    number : number;
-    edge : number;
 }
