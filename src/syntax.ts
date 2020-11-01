@@ -305,7 +305,7 @@ export class EncryptedDPIRequest extends MOperationElement {
  *     contents of the descriptor to be injected. For standard descriptors, the recommended method is to update
  *     this protocol to include a request for the new descriptor."
  */
-export class DescriptorImage {
+export class DescriptorImage extends BitstreamElement {
     @Field(8) byte1;
     @Field(8) imageLength : number;
     @Field(i => 8*i.imageLength) content : Buffer;
