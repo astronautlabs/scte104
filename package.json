@@ -22,7 +22,10 @@
     "broadcast",
     "signalling"
   ],
-  "author": "Astronaut Labs",
+  "author": {
+    "name": "Astronaut Labs, LLC.",
+    "url": "https://astronautlabs.com/"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/astronautlabs/scte104/issues"
