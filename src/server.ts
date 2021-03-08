@@ -31,11 +31,16 @@ export class Connection {
     }
 
     private async handle() {
-        while (true)
+        while (true) {
+            if (globalThis.BITSTREAM_TRACE === true)
+                console.log(`SCTE-104: Waiting for message...`);
             this.onMessageReceived(await syntax.Message.read(this.reader));
+        }
     }
 
     private onMessageReceived(message : syntax.Message) {
+        if (globalThis.BITSTREAM_TRACE === true)
+            console.log(`SCTE-104: Message received (${message.constructor.name})`);
         this._messageReceived.next(message);
         this.server.onMessageReceived({ connection: this, message });
     }
