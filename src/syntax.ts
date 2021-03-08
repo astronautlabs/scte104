@@ -14,15 +14,15 @@ export class SyntaxRegistry {
 
 export function Operation(opCode : number) {
     return target => { 
-        SyntaxRegistry.operations.set(opCode, target.constructor);
-        target.constructor.OP = opCode;
+        SyntaxRegistry.operations.set(opCode, target);
+        target.OP = opCode;
     };
 }
 
 export function MOperation(opCode : number) {
     return target => { 
-        SyntaxRegistry.operations.set(opCode, target.constructor);
-        target.constructor.OP = opCode;
+        SyntaxRegistry.moperations.set(opCode, target);
+        target.OP = opCode;
     };
 }
 
@@ -34,6 +34,10 @@ export class Message extends BitstreamElement {
 
     @Field(16) opID : number;
     @Field(16) messageSize : number;
+
+    static async readElement<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
+        return <any> await super.read(reader);
+    }
 
     static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
         if (await reader.peek(16) === 0xFFFF)
@@ -52,8 +56,12 @@ export class SingleOperationMessage extends Message {
     @Field(16) dpiPidIndex : number;
 
     static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
-        let operationClass = SyntaxRegistry.operations.get(await reader.peek(16)) || SyntaxRegistry.operations.get(undefined);
-        return await operationClass.read(reader);
+        if (<any>this === SingleOperationMessage) {
+            let operationClass = SyntaxRegistry.operations.get(await reader.peek(16)) || SyntaxRegistry.operations.get(undefined);
+            return await operationClass.read(reader);
+        } else {
+            return await (<any>this).readElement(reader);
+        }
     }
 }
 
@@ -140,10 +148,14 @@ export class MultipleOperationMessage extends Message {
     @Field() timestamp : Timestamp;
     operations : MOperationElement[] = [];
 
+    static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
+        return await (<any>this).readElement(reader);
+    }
+
     async read(reader : BitstreamReader) {
-        super.read(reader);
+        await super.read(reader);
         this.operations = [];
-        for (let i = 0, max = await reader.read(8); i < max; ++i)
+        for (let i = 0, max = await reader.read(16); i < max; ++i)
             this.operations.push(await SyntaxRegistry.readMOperation(reader, await reader.peek(16)));
     }
 }
