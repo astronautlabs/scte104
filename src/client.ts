@@ -6,7 +6,7 @@ import * as syntax from './syntax';
 import { SingleOperationMessage } from './syntax';
 import { filter, take } from 'rxjs/operators';
 
-export class ClientV2 {
+export class Client {
     socket : net.Socket;
     private messageNumber = 300;
 
@@ -47,7 +47,7 @@ export class ClientV2 {
     }
 
     async disconnect() {
-        return new Promise(resolve => this.socket.end(() => resolve()));
+        return new Promise<void>(resolve => this.socket.end(() => resolve()));
     }
 
     sendMessage(message : syntax.Message) {

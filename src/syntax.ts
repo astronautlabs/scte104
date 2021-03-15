@@ -1,29 +1,21 @@
-import { BitstreamElement, BitstreamReader, Field } from "@astronautlabs/bitstream";
-import { Constructor } from "@astronautlabs/bitstream/dist/constructor";
+import { BitstreamElement, BitstreamReader, Field, Variant } from "@astronautlabs/bitstream";
+import { Constructor } from "@astronautlabs/bitstream";
 import * as Protocol from './protocol';
 
-export class SyntaxRegistry {
-    static operations = new Map<number, any>();
-    static moperations = new Map<number, any>();
-
-    static async readMOperation(reader : BitstreamReader, opCode : number) {
-        let moperationClass = this.moperations.get(opCode) || this.moperations.get(undefined);
-        return await moperationClass.read(reader);
-    }
+export function Operation(opCode : number) {
+    return Variant(i => i.opID === opCode);
 }
 
-export function Operation(opCode : number) {
-    return target => { 
-        SyntaxRegistry.operations.set(opCode, target);
-        target.OP = opCode;
-    };
+export function DefaultOperation() {
+    return Variant(i => true, { priority: "last" });
 }
 
 export function MOperation(opCode : number) {
-    return target => { 
-        SyntaxRegistry.moperations.set(opCode, target);
-        target.OP = opCode;
-    };
+    return Variant((i : MOperationElement) => i.opID === opCode);
+}
+
+export function DefaultMOperation() {
+    return Variant(i => true, { priority: "last" });
 }
 
 export class Message extends BitstreamElement {
@@ -34,19 +26,9 @@ export class Message extends BitstreamElement {
 
     @Field(16) opID : number;
     @Field(16) messageSize : number;
-
-    static async readElement<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
-        return <any> await super.read(reader);
-    }
-
-    static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
-        if (await reader.peek(16) === 0xFFFF)
-            return await <any>MultipleOperationMessage.read(reader);
-        else
-            return await <any>SingleOperationMessage.read(reader);
-    }
 }
 
+@Variant(i => i.opID !== 0xFFFF)
 export class SingleOperationMessage extends Message {
     @Field(16) result : number = 0xFFFF;
     @Field(16) resultExtension = 0xFFFF;
@@ -54,18 +36,9 @@ export class SingleOperationMessage extends Message {
     @Field(8) asIndex : number = 0;
     @Field(8) messageNumber : number;
     @Field(16) dpiPidIndex : number;
-
-    static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
-        if (<any>this === SingleOperationMessage) {
-            let operationClass = SyntaxRegistry.operations.get(await reader.peek(16)) || SyntaxRegistry.operations.get(undefined);
-            return await operationClass.read(reader);
-        } else {
-            return await (<any>this).readElement(reader);
-        }
-    }
 }
 
-@Operation(undefined)
+@DefaultOperation()
 export class UnsupportedSOperation extends SingleOperationMessage {
     @Field(i => 8*(i.messageSize - 13)) data : Buffer;
 }
@@ -139,6 +112,7 @@ export class MOperationElement extends BitstreamElement {
     @Field(16) dataLength : number;
 }
 
+@Operation(0xFFFF)
 export class MultipleOperationMessage extends Message {
     @Field(8) protocolVersion = 0;
     @Field(8) asIndex = 0;
@@ -146,21 +120,11 @@ export class MultipleOperationMessage extends Message {
     @Field(16) dpiPidIndex : number;
     @Field(8) scte35ProtocolVersion : number = 0;
     @Field() timestamp : Timestamp;
+    @Field(0, { array: { countFieldLength: 8, type: MOperationElement }})
     operations : MOperationElement[] = [];
-
-    static async read<T extends BitstreamElement>(this : Constructor<T>, reader : BitstreamReader) : Promise<T> {
-        return await (<any>this).readElement(reader);
-    }
-
-    async read(reader : BitstreamReader) {
-        await super.read(reader);
-        this.operations = [];
-        for (let i = 0, max = await reader.read(16); i < max; ++i)
-            this.operations.push(await SyntaxRegistry.readMOperation(reader, await reader.peek(16)));
-    }
 }
 
-@MOperation(undefined)
+@DefaultMOperation()
 export class UnsupportedMOperation extends MOperationElement {
     @Field(i => 8*i.dataLength) data : Buffer;
 }
@@ -236,14 +200,9 @@ export class ProvisionedService extends BitstreamElement {
     @Field(0, { array: { type: ProvisionedServiceDpiPid, countFieldLength: 8 }}) 
     dpiPids : ProvisionedServiceDpiPid[];
     @Field(8) componentMode : number;
-    injectorComponentList : InjectorComponentList;
 
-    async read(bitstream : BitstreamReader) {
-        this.readGroup(bitstream, '*');
-        if (this.componentMode !== 0) {
-            this.injectorComponentList = await InjectorComponentList.read(bitstream);
-        }
-    }
+    @Field(0, { presentWhen: i => i.componentMode !== 0 })
+    components : InjectorComponentList;
 }
 
 @Operation(Protocol.OP.PROVISIONING_REQUEST)
@@ -353,7 +312,7 @@ export class InsertSegmentationDescriptorRequest extends MOperationElement {
     @Field(16) duration : number;
     @Field(8) upidType : number;
     @Field(8) upidLength : number;
-    @Field(i => 8 * i.upidLength) upid : number;
+    @Field(i => i.upidLength) upid : Buffer;
     @Field(8) typeId : number;
     @Field(8) numberOfSegments : number;
     @Field(8) expectedSegments : number;
