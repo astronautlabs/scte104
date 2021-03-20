@@ -1,4 +1,4 @@
-import { BitstreamElement, BitstreamReader, Field, Variant } from "@astronautlabs/bitstream";
+import { BitstreamElement, BitstreamReader, Field, Marker, Variant, VariantMarker } from "@astronautlabs/bitstream";
 import { Constructor } from "@astronautlabs/bitstream";
 import * as Protocol from './protocol';
 
@@ -24,8 +24,16 @@ export class Message extends BitstreamElement {
         this.opID = (this.constructor as any).OP;
     }
 
+    @Marker() $startOfMessage;
+
     @Field(16) opID : number;
-    @Field(16) messageSize : number;
+    @Field(16, { 
+        writtenValue: i => i.measure(i => i.$startOfMessage, i => i.$endOfMessage) / 8
+    }) messageSize : number;
+
+    @VariantMarker() $variant;
+
+    @Marker() $endOfMessage;
 }
 
 @Variant(i => i.opID !== 0xFFFF)
@@ -48,58 +56,27 @@ export class GeneralResponse extends SingleOperationMessage {
 }
 
 export class Timestamp extends BitstreamElement {
-    timeType : number;
-
-    static async deserializeSub(reader : BitstreamReader): Promise<Timestamp> {
-        let timeType = await reader.read(8);
-
-        if (timeType === Protocol.TIME_TYPE_UTC) {
-            let utcTimestamp = new UtcTimestamp();
-            utcTimestamp.timeType = timeType;
-            utcTimestamp.seconds = await reader.read(32);
-            utcTimestamp.microseconds = await reader.read(32);
-
-            return utcTimestamp;
-        } else if (timeType === Protocol.TIME_TYPE_SMPTE_VITC) {
-            let timestamp = new SmpteVitcTimestamp();
-            timestamp.timeType = timeType;
-            timestamp.hours = await reader.read(1);
-            timestamp.minutes = await reader.read(1);
-            timestamp.seconds = await reader.read(1);
-            timestamp.frames = await reader.read(1);
-
-            return timestamp;
-        } else if (timeType === Protocol.TIME_TYPE_GPI) {
-            let timestamp = new GpiTimestamp();
-            timestamp.number = await reader.read(1);
-            timestamp.edge = await reader.read(1);
-
-            return timestamp;
-        } else {
-            throw new Error(`Unknown time type ${timeType}`);
-        }
-    }
-
-    static async deserialize<T extends BitstreamElement>(this: Constructor<T>, reader: BitstreamReader): Promise<T> {
-        return <any> await Timestamp.deserializeSub(reader);
-    }
+    @Field(8) timeType : number;
 }
 
+@Variant(i => i.timeType === Protocol.TIME_TYPE_UTC)
 export class UtcTimestamp extends Timestamp {
-    seconds : number;
-    microseconds : number;
+    @Field(32) seconds : number;
+    @Field(32) microseconds : number;
 }
 
+@Variant(i => i.timeType === Protocol.TIME_TYPE_SMPTE_VITC)
 export class SmpteVitcTimestamp extends Timestamp {
-    hours : number;
-    minutes : number;
-    seconds : number;
-    frames : number;
+    @Field(8) hours : number;
+    @Field(8) minutes : number;
+    @Field(8) seconds : number;
+    @Field(8) frames : number;
 }
 
+@Variant(i => i.timeType === Protocol.TIME_TYPE_GPI)
 export class GpiTimestamp extends Timestamp {
-    number : number;
-    edge : number;
+    @Field(8) number : number;
+    @Field(8) edge : number;
 }
 
 export class Time extends BitstreamElement {
@@ -109,15 +86,31 @@ export class Time extends BitstreamElement {
 
 export class MOperationElement extends BitstreamElement {
     @Field(16) opID : number;
-    @Field(16) dataLength : number;
+    @Field(16, {
+        writtenValue: i => i.measure(i => i.$startOfMopData, i => i.$endOfMopData) / 8
+    }) 
+    dataLength : number;
+
+    @Marker() $startOfMopData;
+
+    @VariantMarker() $variant;
+
+    @Marker() $endOfMopData;
 }
+
+let NEXT_MESSAGE_NUMBER = 0;
 
 @Operation(0xFFFF)
 export class MultipleOperationMessage extends Message {
+    constructor() {
+        super();
+        this.messageNumber = ++NEXT_MESSAGE_NUMBER;
+    }
+
     @Field(8) protocolVersion = 0;
     @Field(8) asIndex = 0;
     @Field(8) messageNumber : number;
-    @Field(16) dpiPidIndex : number;
+    @Field(16) dpiPidIndex : number = 0;
     @Field(8) scte35ProtocolVersion : number = 0;
     @Field() timestamp : Timestamp;
     @Field(0, { array: { countFieldLength: 8, type: MOperationElement }})
