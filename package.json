@@ -1,6 +1,6 @@
 {
   "name": "@astronautlabs/scte104",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Implementation of the SCTE-104 TCP/IP protocol",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
