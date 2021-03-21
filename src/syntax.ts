@@ -61,12 +61,14 @@ export class Timestamp extends BitstreamElement {
 
 @Variant(i => i.timeType === Protocol.TIME_TYPE_UTC)
 export class UtcTimestamp extends Timestamp {
+    timeType : number = Protocol.TIME_TYPE_UTC;
     @Field(32) seconds : number;
     @Field(32) microseconds : number;
 }
 
 @Variant(i => i.timeType === Protocol.TIME_TYPE_SMPTE_VITC)
 export class SmpteVitcTimestamp extends Timestamp {
+    timeType : number = Protocol.TIME_TYPE_SMPTE_VITC;
     @Field(8) hours : number;
     @Field(8) minutes : number;
     @Field(8) seconds : number;
@@ -75,6 +77,7 @@ export class SmpteVitcTimestamp extends Timestamp {
 
 @Variant(i => i.timeType === Protocol.TIME_TYPE_GPI)
 export class GpiTimestamp extends Timestamp {
+    timeType : number = Protocol.TIME_TYPE_GPI;
     @Field(8) number : number;
     @Field(8) edge : number;
 }
