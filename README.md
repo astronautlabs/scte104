@@ -9,7 +9,18 @@
 > This library is new, no compatibility is currently guaranteed between 
 > releases (beta, semver 0.x.x).
 
+> 📺 Part of the **Astronaut Labs Broadcast Suite**  
+> [@/rfc8331](https://github.com/astronautlabs/rfc8331) |
+> [@/scte104](https://github.com/astronautlabs/scte104) | 
+> [@/scte35](https://github.com/astronautlabs/scte35) | 
+> [@/st2010](https://github.com/astronautlabs/st2010) | 
+> [@/st291](https://github.com/astronautlabs/st291)
+
+---
+
 Implementation of the SCTE-104 TCP/IP protocol in Typescript
+
+## Summary
 
 This library provides a low-level, compliant implementation of the 
 Automation System to Compression System TCP/IP signalling protocol 
@@ -21,7 +32,7 @@ encryption, scheduling, and nearly all the messages that are outside of the "Sim
 
 Uses [@/bitstream](https://github.com/astronautlabs/bitstream) to handle bitstream serialization/deserialization.
 
-# Client
+## Client
 
 ```typescript
 import * as SCTE104 from "@astronautlabs/scte104";
@@ -69,7 +80,7 @@ async function main(argv : string[]) {
 main(process.argv.slice(1));
 ```
 
-# Server
+## Server
 
 ```typescript
 import * as SCTE104 from '@astronautlabs/scte104';
@@ -103,6 +114,6 @@ The Server class just exposes the ability to accept a connection from a '104 cli
 subscribe to notifications of incoming messages from that connection, and send messages
 back.
 
-# Roadmap
+## Roadmap
 - Provide an easy to access API for SCTE-104 encoding/decoding for auxiliary usecases
 - Provide an optional higher-level, opinionated fluent API on top
