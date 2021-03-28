@@ -1,11 +1,15 @@
 # @astronautlabs/scte104
-> **Beta Quality**  
+
+> **[📜 ANSI/SCTE 104 2019r1](https://webstore.ansi.org/Standards/SCTE/ANSISCTE1042019r1)**  
+> Automation System To Compression System Communications Applications Program Interface (API)
+
+> 📝 **Beta Quality**  
 > This library is new, no compatibility is currently guaranteed between 
 > releases (beta, semver 0.x.x).
 
-Implementation of the SCTE-104 TCP/IP protocol
+Implementation of the SCTE-104 TCP/IP protocol in Typescript
 
-This Typescript library provides a low-level, compliant implementation of the 
+This library provides a low-level, compliant implementation of the 
 Automation System to Compression System TCP/IP signalling protocol 
 specified in SCTE-104. It can be used to make calls to compliant 
 SCTE-104 "injectors" or to implement SCTE-104 "injectors" themselves.
