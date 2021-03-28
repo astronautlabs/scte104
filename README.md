@@ -1,4 +1,6 @@
-# @astronautlabs/scte104
+# @/scte104
+
+[![npm](https://img.shields.io/npm/v/@astronautlabs/scte104)](https://npmjs.com/package/@astronautlabs/scte104)
 
 > **[📜 ANSI/SCTE 104 2019r1](https://webstore.ansi.org/Standards/SCTE/ANSISCTE1042019r1)**  
 > Automation System To Compression System Communications Applications Program Interface (API)
