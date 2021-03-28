@@ -108,6 +108,7 @@ export class MultipleOperationMessage extends Message {
     constructor() {
         super();
         this.messageNumber = ++NEXT_MESSAGE_NUMBER;
+        this.opID = Protocol.MULTIPLE_OPERATION_INDICATOR;
     }
 
     @Field(8) protocolVersion = 0;
