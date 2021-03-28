@@ -1,7 +1,7 @@
 # @astronautlabs/scte104
-> **Alpha Quality**  
-> This library is very new, and no compatibility is currently guaranteed between 
-> releases (alpha, semver 0.0.x).
+> **Beta Quality**  
+> This library is new, no compatibility is currently guaranteed between 
+> releases (beta, semver 0.x.x).
 
 Implementation of the SCTE-104 TCP/IP protocol
 
@@ -63,7 +63,7 @@ async function main(argv : string[]) {
 main(process.argv.slice(1));
 ```
 
-# Server [WIP]
+# Server
 
 ```typescript
 import * as SCTE104 from '@astronautlabs/scte104';
@@ -98,6 +98,5 @@ subscribe to notifications of incoming messages from that connection, and send m
 back.
 
 # Roadmap
-- Implement the "server" (Communication System) side of the protocol
 - Provide an easy to access API for SCTE-104 encoding/decoding for auxiliary usecases
 - Provide an optional higher-level, opinionated fluent API on top
