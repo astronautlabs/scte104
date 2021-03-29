@@ -39,7 +39,7 @@
     "typescript": "^3.8.3"
   },
   "dependencies": {
-    "@astronautlabs/bitstream": "^1.0.3",
+    "@astronautlabs/bitstream": "^2.0.2",
     "rxjs": "^6.6.3"
   }
 }

@@ -39,7 +39,7 @@ export class Client {
 
     private async messageHandler() {
         while (this.socket.readable)
-            this._messageReceived.next(await SingleOperationMessage.read(this.reader));
+            this._messageReceived.next(await SingleOperationMessage.readBlocking(this.reader));
     }
 
     get messageReceived() : Observable<syntax.SingleOperationMessage> {

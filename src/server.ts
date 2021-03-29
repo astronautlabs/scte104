@@ -34,7 +34,7 @@ export class Connection {
         while (true) {
             if (globalThis.BITSTREAM_TRACE === true)
                 console.log(`SCTE-104: Waiting for message...`);
-            this.onMessageReceived(await syntax.Message.read(this.reader));
+            this.onMessageReceived(await syntax.Message.readBlocking(this.reader));
         }
     }
 
