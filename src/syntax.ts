@@ -63,7 +63,7 @@ export class Timestamp extends BitstreamElement {
 export class UtcTimestamp extends Timestamp {
     timeType : number = Protocol.TIME_TYPE_UTC;
     @Field(32) seconds : number;
-    @Field(32) microseconds : number;
+    @Field(16) microseconds : number;
 }
 
 @Variant(i => i.timeType === Protocol.TIME_TYPE_SMPTE_VITC)
