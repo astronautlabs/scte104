@@ -47,9 +47,6 @@ export class Connection {
 }
 
 export class Server {
-    constructor(readonly port = 5167) {
-    }
-
     private _server : net.Server;
     private _messageReceived = new Subject<MessageEvent>();
 
@@ -63,9 +60,9 @@ export class Server {
         return this._messageReceived;
     }
 
-    async listen() {
+    async listen(port: number = 5167, bind: string = '0.0.0.0') {
         this._server = new net.Server(socket => new Connection(socket, this));
-        this._server.listen(this.port);
+        this._server.listen(port, bind);
     }
 
     close() {
