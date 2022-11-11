@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import "@alterior/platform-nodejs";
 
 import { Command, CommandLine } from '@alterior/command-line';
