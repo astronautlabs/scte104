@@ -14,9 +14,8 @@
 > [@/st2010](https://github.com/astronautlabs/st2010) | 
 > [@/st291](https://github.com/astronautlabs/st291)
 
-> 📝 **Beta Quality**  
-> This library is new, no compatibility is currently guaranteed between 
-> releases (beta, semver 0.x.x).
+> 🚀 **Production Quality**  
+> This library is functionally complete and is ready for use in production.
 
 ---
 
