@@ -7,6 +7,9 @@
   "directories": {
     "doc": "docs"
   },
+  "bin": {
+    "scte104": "dist/cli.js"
+  },
   "scripts": {
     "build": "tsc -p .",
     "prepublishOnly": "npm run test",
@@ -33,12 +36,14 @@
   "homepage": "https://github.com/astronautlabs/scte104#readme",
   "devDependencies": {
     "@types/node": "^14.0.4",
-    "razmin": "^0.6.10",
+    "razmin": "^1.2.0",
     "reflect-metadata": "^0.1.13",
     "source-map-support": "^0.5.16",
     "typescript": "^3.8.3"
   },
   "dependencies": {
+    "@alterior/command-line": "^3.0.0-rc.5",
+    "@alterior/platform-nodejs": "^3.0.2",
     "@astronautlabs/bitstream": "^2.0.2",
     "rxjs": "^6.6.3"
   }

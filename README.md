@@ -116,6 +116,17 @@ The Server class just exposes the ability to accept a connection from a '104 cli
 subscribe to notifications of incoming messages from that connection, and send messages
 back.
 
+## Command Line Client
+
+This package also includes a simple command-line client for sending quick splice start/end messages to a SCTE 104 injector/automation system.
+
+```
+npm install @astronautlabs/scte104 -g
+scte104 --server injector.example.com splice-start --immediate --program-id 12345
+```
+
+For complete set of options, use `scte104 --help`.
+
 ## Roadmap
 - Provide an easy to access API for SCTE-104 encoding/decoding for auxiliary usecases
 - Provide an optional higher-level, opinionated fluent API on top
