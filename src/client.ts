@@ -74,8 +74,8 @@ export class Client {
     async alive() {
         let epoch = new Date('1980-01-06T00:00:00Z').getTime();
         let elapsed = Date.now() - epoch;
-        let seconds = Math.floor(elapsed / 1000);
-        let microseconds = (elapsed - seconds) * 1000;
+        let seconds = elapsed / 1000 | 0;
+        let microseconds = (elapsed - seconds*1000) * 1000;
         this.sendMessage(
             new syntax.AliveRequest().with({ 
                 time: new syntax.Time().with({ 
