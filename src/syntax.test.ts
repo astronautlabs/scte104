@@ -2,7 +2,7 @@ import { describe } from "razmin";
 import { MultipleOperationMessage } from "./syntax";
 
 describe("SCTE-104", it => {
-    it.only('parses a simple SCTE-104 message with no timestamp associated correctly', async () => {
+    it('parses a simple SCTE-104 message with no timestamp associated correctly', async () => {
         let bytes = Uint8Array.from([
             0xff, 0xff, 0x00, 0x1e, 0x00, 0x00, 0x25, 
             0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 
@@ -11,10 +11,10 @@ describe("SCTE-104", it => {
             0x00, 0x01
         ]);
 
-        console.log(`Bytes: ${bytes.length}`);
         let result = await MultipleOperationMessage.deserialize(bytes);
-
-        console.dir(result);
+        
+        // console.log(`Bytes: ${bytes.length}`);
+        // console.dir(result);
     });
 
     it('parses a SCTE-104 message correctly when it has a UTC timestamp associated', async () => {
@@ -26,7 +26,7 @@ describe("SCTE-104", it => {
         ]);
         let result = await MultipleOperationMessage.deserialize(bytes);
 
-        console.log(`Bytes: ${bytes.length}`);
-        console.dir(result);
+        // console.log(`Bytes: ${bytes.length}`);
+        // console.dir(result);
     })
 });
